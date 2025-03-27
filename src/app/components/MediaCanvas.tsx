@@ -129,10 +129,9 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     
     // Handle drag with react-draggable
     const handleDragStart = () => {
-      if (isPlaying) return false;
+      if (isPlaying) return;
       setActiveInteraction('drag');
       onItemSelect(item.id);
-      return true;
     };
     
     const handleDrag = (_e: DraggableEvent, data: DraggableData) => {

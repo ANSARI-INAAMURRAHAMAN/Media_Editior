@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Dropzone } from '@mantine/dropzone';
 import { Button, TextInput, Slider, ColorInput, Tabs, Select, NumberInput, Group, Switch } from '@mantine/core';
-import { IconUpload, IconPhoto, IconTypography, IconTrash, IconPlayerPlay, IconGrid4x4 } from '@tabler/icons-react';
+import { IconUpload, IconPhoto, IconTypography, IconTrash, IconPlayerPlay} from '@tabler/icons-react';
 
 interface MediaItem {
   id: string;

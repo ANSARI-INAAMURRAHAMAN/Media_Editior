@@ -1,14 +1,14 @@
-import React, { useRef, forwardRef } from 'react';
+import React, { useRef} from 'react';
 import Draggable, { DraggableProps, DraggableEventHandler } from 'react-draggable';
 
 // Create a compatible version of Draggable that works with React 19
 const DraggableWrapper: React.FC<DraggableProps & { children: React.ReactNode }> = (props) => {
-  const nodeRef = useRef(null);
+  const nodeRef = useRef<HTMLDivElement | null>(null);
   
   return (
     <Draggable
       {...props}
-      nodeRef={nodeRef}
+      nodeRef={nodeRef as React.RefObject<HTMLElement>}
     >
       <div ref={nodeRef} style={{ position: 'absolute', top: 0, left: 0 }}>
         {props.children}
