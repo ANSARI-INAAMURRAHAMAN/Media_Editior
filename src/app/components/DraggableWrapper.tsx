@@ -10,7 +10,7 @@ const DraggableWrapper: React.FC<DraggableProps & { children: React.ReactNode }>
       {...props}
       nodeRef={nodeRef}
     >
-      <div ref={nodeRef}>
+      <div ref={nodeRef} style={{ position: 'absolute', top: 0, left: 0 }}>
         {props.children}
       </div>
     </Draggable>
@@ -20,5 +20,5 @@ const DraggableWrapper: React.FC<DraggableProps & { children: React.ReactNode }>
 export default DraggableWrapper;
 
 // Re-export types from react-draggable for convenience
-export { DraggableData, DraggableEvent } from 'react-draggable';
+export type { DraggableData, DraggableEvent } from 'react-draggable';
 export type { DraggableEventHandler };
