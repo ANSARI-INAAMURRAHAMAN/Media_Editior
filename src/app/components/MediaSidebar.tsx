@@ -3,15 +3,29 @@
 import React, { useState } from 'react';
 import { Dropzone } from '@mantine/dropzone';
 import { Button, TextInput, Slider, ColorInput, Tabs, Select, NumberInput, Group, Switch } from '@mantine/core';
-import { IconUpload, IconPhoto, IconVideo, IconTypography, IconTrash, IconPlayerPlay, IconGrid4x4 } from '@tabler/icons-react';
+import { IconUpload, IconPhoto, IconTypography, IconTrash, IconPlayerPlay, IconGrid4x4 } from '@tabler/icons-react';
+
+interface MediaItem {
+  id: string;
+  type: 'image' | 'video' | 'text';
+  content: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  opacity?: number;
+  color?: string;
+  font?: string;
+  startTime?: number;
+  endTime?: number;
+  rotation?: number;
+}
 
 interface MediaSidebarProps {
   onAddImage: (file: File) => void;
   onAddVideo: (file: File) => void;
   onAddText: (text: string) => void;
   onDeleteSelected: () => void;
-  selectedItem: any | null;
-  onUpdateItem: (changes: any) => void;
+  selectedItem: MediaItem | null;
+  onUpdateItem: (changes: Partial<MediaItem>) => void;
   onPlayTimeline: () => void;
   isPlaying: boolean;
   snapToGrid: boolean;
@@ -87,7 +101,7 @@ const MediaSidebar: React.FC<MediaSidebarProps> = ({
           </div>
           
           <div className="control-panel">
-            <Group position="apart" style={{ marginBottom: '1rem' }}>
+            <Group justify="space-between" style={{ marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <IconGrid4x4 size={16} />
                 <span>Snap to Grid</span>
@@ -189,14 +203,14 @@ const MediaSidebar: React.FC<MediaSidebarProps> = ({
                   value={selectedItem.startTime || 0}
                   onChange={(value) => onUpdateItem({ startTime: Number(value) })}
                   min={0}
-                  precision={1}
+                  step={0.1}
                 />
                 <NumberInput
                   label="End Time (seconds)"
                   value={selectedItem.endTime || 60}
                   onChange={(value) => onUpdateItem({ endTime: Number(value) })}
                   min={(selectedItem.startTime || 0) + 0.1}
-                  precision={1}
+                  step={0.1}
                 />
               </Group>
               
@@ -213,7 +227,7 @@ const MediaSidebar: React.FC<MediaSidebarProps> = ({
                     label="Font"
                     data={['Arial', 'Times New Roman', 'Courier', 'Georgia', 'Verdana']}
                     value={selectedItem.font || 'Arial'}
-                    onChange={(value) => onUpdateItem({ font: value })}
+                    onChange={(value) => onUpdateItem({ font: value || undefined })}
                     style={{ marginBottom: '1rem' }}
                   />
                 </>

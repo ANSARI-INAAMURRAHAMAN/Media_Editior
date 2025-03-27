@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, HTMLMotionProps } from 'framer-motion';
 import { ResizableBox, ResizeCallbackData } from 'react-resizable';
+import Image from 'next/image';
 import 'react-resizable/css/styles.css';
 
 interface MediaItem {
@@ -16,7 +17,7 @@ interface MediaItem {
   font?: string;
   startTime?: number;
   endTime?: number;
-  rotation?: number; // Added rotation property
+  rotation?: number; 
 }
 
 interface MediaCanvasProps {
@@ -25,10 +26,10 @@ interface MediaCanvasProps {
   selectedItem: string | null;
   onItemMove: (id: string, position: { x: number; y: number }) => void;
   onItemResize: (id: string, size: { width: number; height: number }) => void;
-  onItemRotate: (id: string, rotation: number) => void; // Added rotation handler
+  onItemRotate: (id: string, rotation: number) => void;
   currentTime: number;
   isPlaying: boolean;
-  snapToGrid: boolean; // Added grid snapping toggle
+  snapToGrid: boolean;
 }
 
 const MediaCanvas: React.FC<MediaCanvasProps> = ({
@@ -132,7 +133,27 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     // Get content based on item type
     const getItemContent = () => {
       if (item.type === 'image') {
-        return <img src={item.content} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />;
+        // For blob URLs, we'll fall back to regular img tag since Next.js Image
+        // has limitations with blob URLs
+        if (item.content.startsWith('blob:')) {
+          return <img 
+            src={item.content} 
+            alt="Media content" 
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+          />;
+        }
+        
+        return (
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <Image 
+              src={item.content} 
+              alt="Media content" 
+              fill 
+              style={{ objectFit: 'contain' }} 
+              unoptimized={true}
+            />
+          </div>
+        );
       } else if (item.type === 'video') {
         return <video src={item.content} controls={!isPlaying} autoPlay={isPlaying} muted={isPlaying} loop={false} style={{ width: '100%', height: '100%' }} />;
       } else {
@@ -156,54 +177,58 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     // This will prevent dragging during resize operations
     const shouldAllowDrag = !isPlaying && !rotating && !isResizing;
     
+    // Define motion props with proper typing
+    const motionProps: HTMLMotionProps<"div"> = {
+      className: `media-item-container ${isSelected ? 'selected-container' : ''}`,
+      style: {
+        position: 'absolute',
+        transformOrigin: 'center center',
+        opacity: item.opacity ? item.opacity / 100 : 1,
+        rotate: item.rotation || 0,
+        cursor: shouldAllowDrag ? 'move' : 'default',
+        zIndex: isSelected ? 10 : 2,
+      },
+      initial: { x: item.position.x, y: item.position.y },
+      animate: { x: item.position.x, y: item.position.y },
+      drag: shouldAllowDrag,
+      dragMomentum: false,
+      dragElastic: 0,
+      onDragStart: () => setIsDragging(true),
+      onDrag: (e, info) => {
+        if (shouldAllowDrag) {
+          const newX = snapToGridValue(item.position.x + info.delta.x);
+          const newY = snapToGridValue(item.position.y + info.delta.y);
+          onItemMove(item.id, { x: newX, y: newY });
+        }
+      },
+      onDragEnd: () => {
+        setTimeout(() => setIsDragging(false), 100);
+      },
+      onClick: (e: React.MouseEvent) => {
+        if (!isPlaying && !isResizing && !isDragging) {
+          e.stopPropagation();
+          onItemSelect(item.id);
+        }
+      },
+      whileHover: { scale: isPlaying ? 1 : 1.01 },
+      transition: { duration: 0.2 }
+    };
+    
     return (
       <motion.div
         key={item.id}
-        className={`media-item-container ${isSelected ? 'selected-container' : ''}`}
-        style={{
-          position: 'absolute',
-          transformOrigin: 'center center',
-          opacity: item.opacity ? item.opacity / 100 : 1,
-          rotate: item.rotation || 0, // Use Framer Motion's rotate prop instead of transform
-          cursor: shouldAllowDrag ? 'move' : 'default',
-          zIndex: isSelected ? 10 : 2, // Ensure higher than grid
-        }}
-        initial={{ x: item.position.x, y: item.position.y }}
-        animate={{ x: item.position.x, y: item.position.y }}
-        drag={shouldAllowDrag}
-        dragMomentum={false}
-        dragElastic={0} // Prevent elastic drag to improve precision
-        onDragStart={() => setIsDragging(true)}
-        onDrag={(e, info) => {
-          // Update position in real-time to improve feedback
-          if (shouldAllowDrag) {
-            const newX = snapToGridValue(item.position.x + info.offset.x);
-            const newY = snapToGridValue(item.position.y + info.offset.y);
-            onItemMove(item.id, { x: newX, y: newY });
-          }
-        }}
-        onDragEnd={() => {
-          setTimeout(() => setIsDragging(false), 100);
-        }}
-        onClick={(e) => {
-          if (!isPlaying && !isResizing && !isDragging) {
-            e.stopPropagation();
-            onItemSelect(item.id);
-          }
-        }}
-        whileHover={{ scale: isPlaying ? 1 : 1.01 }}
-        transition={{ duration: 0.2 }}
+        {...motionProps}
       >
         <ResizableBox
           width={item.size.width}
           height={item.size.height}
           minConstraints={[50, 50]}
           maxConstraints={[1000, 1000]}
-          resizeHandles={resizeHandles}
+          resizeHandles={resizeHandles as ("s" | "se" | "sw" | "ne" | "nw" | "n" | "e" | "w")[]}
           onResize={onResize}
           onResizeStop={onResizeStop}
           handle={(h, ref) => (
-            <div className={`custom-handle custom-handle-${h}`} ref={ref} />
+            <div className={`custom-handle custom-handle-${h}`} ref={ref as React.Ref<HTMLDivElement>} />
           )}
           className="resizable-box"
         >

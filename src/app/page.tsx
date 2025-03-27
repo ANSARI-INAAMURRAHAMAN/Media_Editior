@@ -30,8 +30,8 @@ export default function Home() {
   const lastUpdateTimeRef = useRef<number | null>(null);
 
   const selectedItem = selectedItemId 
-    ? mediaItems.find(item => item.id === selectedItemId)
-    : null;
+      ? mediaItems.find(item => item.id === selectedItemId) || null
+      : null;
 
   // Handle the timeline playback
   useEffect(() => {
@@ -131,12 +131,13 @@ export default function Home() {
   };
 
   const handleItemMove = (id: string, position: { x: number; y: number }) => {
-    // Ensure we're not going off-screen
+    // Ensure we're not going off-screen with positive bounds check only
     const boundedPosition = {
       x: Math.max(0, position.x),
       y: Math.max(0, position.y)
     };
     
+    // Use functional update to ensure we're working with the latest state
     setMediaItems(prevItems => 
       prevItems.map(item => 
         item.id === id ? { ...item, position: boundedPosition } : item

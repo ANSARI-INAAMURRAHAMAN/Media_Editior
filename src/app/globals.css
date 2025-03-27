@@ -140,6 +140,7 @@ html, body {
   user-select: none;
   border: 2px solid transparent;
   transition: border 0.2s ease;
+  pointer-events: auto; /* Ensure elements inside are clickable */
 }
 
 .media-item:hover, .media-item.selected {
@@ -239,11 +240,6 @@ html, body {
 .media-item-container {
   cursor: move;
   user-select: none;
-}
-
-.media-item-container {
-  position: absolute;
-  user-select: none;
   touch-action: none; /* Prevents touch events from causing page scrolling */
   display: inline-block;
   will-change: transform; /* Improves performance for transforms */
@@ -262,16 +258,7 @@ html, body {
   justify-content: center;
   align-items: center;
   overflow: visible;
-}
-
-.media-item:hover, .media-item.selected {
-  border: 2px solid var(--primary-color);
-}
-
-.resizable-box {
-  width: 100%;
-  height: 100%;
-  position: relative;
+  pointer-events: auto; /* Ensure elements inside are clickable */
 }
 
 .selected-container .react-resizable-handle {
