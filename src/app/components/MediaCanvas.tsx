@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useRef } from 'react';
-import DraggableWrapper, { DraggableData, DraggableEvent } from './DraggableWrapper';
+import React, { useState, useRef, useMemo } from 'react';
+import Draggable, { DraggableData, DraggableEvent } from 'react-draggable';
 import { ResizableBox, ResizeCallbackData } from 'react-resizable';
 import Image from 'next/image';
 import 'react-resizable/css/styles.css';
@@ -44,82 +44,64 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
   snapToGrid
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  // Create a Map to store refs for each media item
+  const draggableRefs = useMemo(() => new Map(), []);
   const [rotating, setRotating] = useState(false);
   const [initialRotation, setInitialRotation] = useState(0);
   const [initialAngle, setInitialAngle] = useState(0);
   const [activeInteraction, setActiveInteraction] = useState<'none' | 'drag' | 'resize' | 'rotate'>('none');
 
-  // Function to handle grid snapping
   const snapToGridValue = (value: number, gridSize: number = 20): number => {
     if (!snapToGrid) return value;
     return Math.round(value / gridSize) * gridSize;
   };
   
   const renderMediaItem = (item: MediaItem) => {
+    // Get or create ref for this item
+    if (!draggableRefs.has(item.id)) {
+      draggableRefs.set(item.id, React.createRef());
+    }
+    const draggableRef = draggableRefs.get(item.id);
     const isSelected = selectedItem === item.id;
-    
-    // Check if the item should be visible based on timing
     const startTime = item.startTime !== undefined ? item.startTime : 0;
     const endTime = item.endTime !== undefined ? item.endTime : Infinity;
     const isVisible = currentTime >= startTime && currentTime <= endTime;
     
-    if (!isVisible && isPlaying) {
-      return null;
-    }
+    if (!isVisible && isPlaying) return null;
     
     const handleRotateStart = (e: React.MouseEvent) => {
       e.stopPropagation();
       setRotating(true);
       setActiveInteraction('rotate');
       setInitialRotation(item.rotation || 0);
-      
-      // Calculate the center of the element
       const rect = (e.currentTarget.parentNode as HTMLElement).getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      
-      // Calculate initial angle between cursor and center
       const initialAngleRad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
       setInitialAngle(initialAngleRad * (180 / Math.PI));
     };
     
     const handleRotateMove = (e: React.MouseEvent) => {
       if (!rotating) return;
-      
       e.stopPropagation();
       e.preventDefault();
-      
-      // Get the center of the element
       const rect = (e.currentTarget.parentNode as HTMLElement).getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      
-      // Calculate new angle
       const angleRad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
       const angle = angleRad * (180 / Math.PI);
-      
-      // Calculate rotation difference and update
       let newRotation = initialRotation + (angle - initialAngle);
-      
-      // Snap to 15-degree increments if grid snapping is enabled
-      if (snapToGrid) {
-        newRotation = Math.round(newRotation / 15) * 15;
-      }
-      
+      if (snapToGrid) newRotation = Math.round(newRotation / 15) * 15;
       onItemRotate(item.id, newRotation);
     };
 
-    // Handle resize from react-resizable
     const onResize = (_e: React.SyntheticEvent, data: ResizeCallbackData) => {
       setActiveInteraction('resize');
       let { width, height } = data.size;
-      
-      // Apply grid snapping if enabled
       if (snapToGrid) {
         width = snapToGridValue(width, 10);
         height = snapToGridValue(height, 10);
       }
-      
       onItemResize(item.id, { width, height });
     };
     
@@ -127,16 +109,20 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
       setTimeout(() => setActiveInteraction('none'), 100);
     };
     
-    // Handle drag with react-draggable
-    const handleDragStart = () => {
-      if (isPlaying) return;
+    const handleDragStart = (e: DraggableEvent) => {
+      if (isPlaying) {
+        e.preventDefault();
+        return false;
+      }
       setActiveInteraction('drag');
       onItemSelect(item.id);
     };
     
-    const handleDrag = (_e: DraggableEvent, data: DraggableData) => {
-      if (isPlaying || activeInteraction !== 'drag') return;
-      
+    const handleDrag = (e: DraggableEvent, data: DraggableData) => {
+      if (isPlaying || activeInteraction !== 'drag') {
+        e.preventDefault();
+        return false;
+      }
       const newX = snapToGridValue(data.x);
       const newY = snapToGridValue(data.y);
       onItemMove(item.id, { x: newX, y: newY });
@@ -148,10 +134,8 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     
     const resizeHandles = isSelected && !isPlaying ? ['se', 'sw', 'ne', 'nw', 'n', 's', 'e', 'w'] : [];
     
-    // Get content based on item type
     const getItemContent = () => {
       if (item.type === 'image') {
-        // For blob URLs, we'll use Next.js Image with unoptimized prop
         return (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <Image 
@@ -183,12 +167,12 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
       }
     };
     
-    // Simplified drag conditions
     const isDraggable = !isPlaying;
     
     return (
-      <DraggableWrapper
+      <Draggable
         key={item.id}
+        nodeRef={draggableRef}
         position={item.position}
         onStart={handleDragStart}
         onDrag={handleDrag}
@@ -196,8 +180,19 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
         disabled={!isDraggable || activeInteraction === 'resize' || activeInteraction === 'rotate'}
         bounds="parent"
         cancel=".custom-handle, .rotate-handle"
+        defaultClassName="draggable-item"
+        defaultClassNameDragging="dragging"
+        defaultClassNameDragged="dragged"
+        axis="both"
+        defaultPosition={{ x: 0, y: 0 }}
+        positionOffset={{ x: 0, y: 0 }}
+        allowAnyClick={true}
+        enableUserSelectHack={true}
+        grid={[1, 1]}
+        scale={1}
       >
         <div
+          ref={draggableRef}
           className={`media-item-container ${isSelected ? 'selected-container' : ''}`}
           style={{
             position: 'absolute',
@@ -248,12 +243,23 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
                   className="rotate-handle"
                   onMouseDown={handleRotateStart}
                   onMouseMove={handleRotateMove}
+                  style={{
+                    position: 'absolute',
+                    bottom: -25,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 20,
+                    height: 20,
+                    borderRadius: '50%',
+                    background: 'blue',
+                    cursor: 'grab'
+                  }}
                 />
               )}
             </div>
           </ResizableBox>
         </div>
-      </DraggableWrapper>
+      </Draggable>
     );
   };
 
@@ -261,8 +267,14 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     <div 
       className="canvas" 
       ref={canvasRef}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        backgroundColor: '#f0f0f0'
+      }}
       onClick={() => {
-        // Deselect when clicking on the canvas (and not on an item)
         if (activeInteraction === 'none') {
           onItemSelect('');
         }
@@ -271,16 +283,23 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
         setRotating(false);
         setActiveInteraction('none');
       }}
+      onMouseLeave={() => {
+        setRotating(false);
+        setActiveInteraction('none');
+      }}
     >
-      {/* Add a grid rendering function or remove this line if not needed */}
-      {/* Example: */}
-      <div className="grid-overlay">
-        {/* Render grid lines or any grid-related content here */}
-      </div>
       {mediaItems.map(renderMediaItem)}
       
       {isPlaying && (
-        <div className="time-display">
+        <div style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          background: 'rgba(0,0,0,0.7)',
+          color: 'white',
+          padding: '5px 10px',
+          borderRadius: 4
+        }}>
           Time: {currentTime.toFixed(1)}s
         </div>
       )}
