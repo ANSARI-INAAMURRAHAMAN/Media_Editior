@@ -1,95 +1,201 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import MediaCanvas from './components/MediaCanvas';
+import MediaSidebar from './components/MediaSidebar';
+import { v4 as uuidv4 } from 'uuid';
+
+interface MediaItem {
+  id: string;
+  type: 'image' | 'video' | 'text';
+  content: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  opacity?: number;
+  color?: string;
+  font?: string;
+  startTime?: number;
+  endTime?: number;
+  rotation?: number; // Added rotation property
+}
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [snapToGrid, setSnapToGrid] = useState(false); // Added grid snapping state
+  
+  const timerRef = useRef<number | null>(null);
+  const lastUpdateTimeRef = useRef<number | null>(null);
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+  const selectedItem = selectedItemId 
+    ? mediaItems.find(item => item.id === selectedItemId)
+    : null;
+
+  // Handle the timeline playback
+  useEffect(() => {
+    if (isPlaying) {
+      lastUpdateTimeRef.current = Date.now();
+      
+      const updateTimer = () => {
+        const now = Date.now();
+        const deltaTime = (now - (lastUpdateTimeRef.current || now)) / 1000;
+        lastUpdateTimeRef.current = now;
+        
+        setCurrentTime(prev => prev + deltaTime);
+        timerRef.current = requestAnimationFrame(updateTimer);
+      };
+      
+      timerRef.current = requestAnimationFrame(updateTimer);
+    } else {
+      if (timerRef.current !== null) {
+        cancelAnimationFrame(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (timerRef.current !== null) {
+        cancelAnimationFrame(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isPlaying]);
+
+  const handlePlayTimeline = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+    } else {
+      setCurrentTime(0);
+      setIsPlaying(true);
+    }
+  };
+
+  const handleAddImage = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const newItem: MediaItem = {
+      id: uuidv4(),
+      type: 'image',
+      content: url,
+      position: { x: 100, y: 100 },
+      size: { width: 300, height: 200 },
+      opacity: 100,
+      startTime: 0,
+      endTime: 10,
+      rotation: 0
+    };
+    setMediaItems([...mediaItems, newItem]);
+    setSelectedItemId(newItem.id);
+  };
+
+  const handleAddVideo = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const newItem: MediaItem = {
+      id: uuidv4(),
+      type: 'video',
+      content: url,
+      position: { x: 100, y: 100 },
+      size: { width: 320, height: 240 },
+      opacity: 100,
+      startTime: 0,
+      endTime: 15,
+      rotation: 0
+    };
+    setMediaItems([...mediaItems, newItem]);
+    setSelectedItemId(newItem.id);
+  };
+
+  const handleAddText = (text: string) => {
+    const newItem: MediaItem = {
+      id: uuidv4(),
+      type: 'text',
+      content: text,
+      position: { x: 100, y: 100 },
+      size: { width: 200, height: 100 },
+      color: '#ffffff',
+      font: 'Arial',
+      opacity: 100,
+      startTime: 0,
+      endTime: 5
+    };
+    setMediaItems([...mediaItems, newItem]);
+    setSelectedItemId(newItem.id);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedItemId) {
+      setMediaItems(mediaItems.filter(item => item.id !== selectedItemId));
+      setSelectedItemId(null);
+    }
+  };
+
+  const handleItemMove = (id: string, position: { x: number; y: number }) => {
+    // Ensure we're not going off-screen
+    const boundedPosition = {
+      x: Math.max(0, position.x),
+      y: Math.max(0, position.y)
+    };
+    
+    setMediaItems(prevItems => 
+      prevItems.map(item => 
+        item.id === id ? { ...item, position: boundedPosition } : item
+      )
+    );
+  };
+
+  const handleItemResize = (id: string, size: { width: number; height: number }) => {
+    setMediaItems(prevItems => 
+      prevItems.map(item => 
+        item.id === id ? { ...item, size } : item
+      )
+    );
+  };
+  
+  // Add rotation handler
+  const handleItemRotate = (id: string, rotation: number) => {
+    setMediaItems(prevItems => 
+      prevItems.map(item => 
+        item.id === id ? { ...item, rotation } : item
+      )
+    );
+  };
+
+  const handleUpdateItem = (changes: Partial<MediaItem>) => {
+    if (selectedItemId) {
+      setMediaItems(prevItems => 
+        prevItems.map(item => 
+          item.id === selectedItemId ? { ...item, ...changes } : item
+        )
+      );
+    }
+  };
+
+  return (
+    <main className="app-container">
+      <MediaCanvas 
+        mediaItems={mediaItems}
+        onItemSelect={setSelectedItemId}
+        selectedItem={selectedItemId}
+        onItemMove={handleItemMove}
+        onItemResize={handleItemResize}
+        onItemRotate={handleItemRotate}
+        currentTime={currentTime}
+        isPlaying={isPlaying}
+        snapToGrid={snapToGrid}
+      />
+      <MediaSidebar
+        onAddImage={handleAddImage}
+        onAddVideo={handleAddVideo}
+        onAddText={handleAddText}
+        onDeleteSelected={handleDeleteSelected}
+        selectedItem={selectedItem}
+        onUpdateItem={handleUpdateItem}
+        onPlayTimeline={handlePlayTimeline}
+        isPlaying={isPlaying}
+        snapToGrid={snapToGrid}
+        setSnapToGrid={setSnapToGrid}
+      />
+    </main>
   );
 }
