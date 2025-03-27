@@ -101,17 +101,6 @@ const MediaSidebar: React.FC<MediaSidebarProps> = ({
           </div>
           
           <div className="control-panel">
-            <Group justify="space-between" style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <IconGrid4x4 size={16} />
-                <span>Snap to Grid</span>
-              </div>
-              <Switch 
-                checked={snapToGrid} 
-                onChange={(event) => setSnapToGrid(event.currentTarget.checked)} 
-              />
-            </Group>
-            
             <Button 
               onClick={onPlayTimeline}
               leftSection={<IconPlayerPlay size={16} />}
@@ -120,6 +109,16 @@ const MediaSidebar: React.FC<MediaSidebarProps> = ({
             >
               {isPlaying ? "Stop" : "Play Timeline"}
             </Button>
+          </div>
+          
+          <div className="control-panel">
+            <Group>
+              <Switch 
+                label="Snap to Grid" 
+                checked={snapToGrid}
+                onChange={(event) => setSnapToGrid(event.currentTarget.checked)}
+              />
+            </Group>
           </div>
         </Tabs.Panel>
 

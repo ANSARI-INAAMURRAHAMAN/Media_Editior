@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, HTMLMotionProps } from 'framer-motion';
+import React, { useState, useRef } from 'react';
+import DraggableWrapper, { DraggableData, DraggableEvent } from './DraggableWrapper';
 import { ResizableBox, ResizeCallbackData } from 'react-resizable';
 import Image from 'next/image';
 import 'react-resizable/css/styles.css';
@@ -110,8 +110,7 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     };
 
     // Handle resize from react-resizable
-    const onResize = (e: React.SyntheticEvent, data: ResizeCallbackData) => {
-      e.stopPropagation();
+    const onResize = (_e: React.SyntheticEvent, data: ResizeCallbackData) => {
       setActiveInteraction('resize');
       let { width, height } = data.size;
       
@@ -128,21 +127,32 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
       setTimeout(() => setActiveInteraction('none'), 100);
     };
     
+    // Handle drag with react-draggable
+    const handleDragStart = () => {
+      if (isPlaying) return false;
+      setActiveInteraction('drag');
+      onItemSelect(item.id);
+      return true;
+    };
+    
+    const handleDrag = (_e: DraggableEvent, data: DraggableData) => {
+      if (isPlaying || activeInteraction !== 'drag') return;
+      
+      const newX = snapToGridValue(data.x);
+      const newY = snapToGridValue(data.y);
+      onItemMove(item.id, { x: newX, y: newY });
+    };
+    
+    const handleDragStop = () => {
+      setActiveInteraction('none');
+    };
+    
     const resizeHandles = isSelected && !isPlaying ? ['se', 'sw', 'ne', 'nw', 'n', 's', 'e', 'w'] : [];
     
     // Get content based on item type
     const getItemContent = () => {
       if (item.type === 'image') {
-        // For blob URLs, we'll fall back to regular img tag since Next.js Image
-        // has limitations with blob URLs
-        if (item.content.startsWith('blob:')) {
-          return <img 
-            src={item.content} 
-            alt="Media content" 
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-          />;
-        }
-        
+        // For blob URLs, we'll use Next.js Image with unoptimized prop
         return (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <Image 
@@ -150,7 +160,7 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
               alt="Media content" 
               fill 
               style={{ objectFit: 'contain' }} 
-              unoptimized={true}
+              unoptimized 
             />
           </div>
         );
@@ -175,146 +185,76 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     };
     
     // Simplified drag conditions
-    const isDraggable = !isPlaying && activeInteraction === 'none';
-    
-    // Define motion props with proper typing
-    const motionProps: HTMLMotionProps<"div"> = {
-      className: `media-item-container ${isSelected ? 'selected-container' : ''}`,
-      style: {
-        position: 'absolute',
-        transformOrigin: 'center center',
-        opacity: item.opacity ? item.opacity / 100 : 1,
-        rotate: item.rotation || 0,
-        cursor: isDraggable ? 'move' : 'default',
-        zIndex: isSelected ? 10 : 2,
-      },
-      initial: { x: item.position.x, y: item.position.y },
-      animate: { x: item.position.x, y: item.position.y },
-      drag: isDraggable,
-      dragMomentum: false,
-      dragElastic: 0,
-      onDragStart: (e, info) => {
-        setActiveInteraction('drag');
-      },
-      onDrag: (e, info) => {
-        if (isDraggable) {
-          const newX = snapToGridValue(item.position.x + info.delta.x);
-          const newY = snapToGridValue(item.position.y + info.delta.y);
-          onItemMove(item.id, { x: newX, y: newY });
-        }
-      },
-      onDragEnd: () => {
-        setActiveInteraction('none');
-      },
-      onClick: (e: React.MouseEvent) => {
-        if (!isPlaying && activeInteraction === 'none') {
-          e.stopPropagation();
-          onItemSelect(item.id);
-        }
-      },
-      whileHover: { scale: isPlaying ? 1 : 1.01 },
-      transition: { duration: 0.2 }
-    };
+    const isDraggable = !isPlaying;
     
     return (
-      <motion.div
+      <DraggableWrapper
         key={item.id}
-        {...motionProps}
+        position={item.position}
+        onStart={handleDragStart}
+        onDrag={handleDrag}
+        onStop={handleDragStop}
+        disabled={!isDraggable || activeInteraction === 'resize' || activeInteraction === 'rotate'}
+        bounds="parent"
+        cancel=".custom-handle, .rotate-handle"
       >
-        <ResizableBox
-          width={item.size.width}
-          height={item.size.height}
-          minConstraints={[50, 50]}
-          maxConstraints={[1000, 1000]}
-          resizeHandles={resizeHandles as ("s" | "se" | "sw" | "ne" | "nw" | "n" | "e" | "w")[]}
-          onResize={onResize}
-          onResizeStop={onResizeStop}
-          handle={(h, ref) => (
-            <div className={`custom-handle custom-handle-${h}`} ref={ref as React.Ref<HTMLDivElement>} />
-          )}
-          className="resizable-box"
+        <div
+          className={`media-item-container ${isSelected ? 'selected-container' : ''}`}
+          style={{
+            position: 'absolute',
+            transformOrigin: 'center center',
+            opacity: item.opacity ? item.opacity / 100 : 1,
+            transform: `rotate(${item.rotation || 0}deg)`,
+            cursor: isDraggable && activeInteraction === 'none' ? 'move' : 'default',
+            zIndex: isSelected ? 10 : 2,
+            transition: 'transform 0.2s ease, opacity 0.2s ease, border 0.2s ease',
+            border: isSelected ? '2px solid blue' : '2px solid transparent',
+            borderRadius: '4px'
+          }}
+          onClick={(e) => {
+            if (!isPlaying && activeInteraction === 'none') {
+              e.stopPropagation();
+              onItemSelect(item.id);
+            }
+          }}
         >
-          <div 
-            className={`media-item ${isSelected ? 'selected' : ''}`}
-            style={{
-              width: '100%',
-              height: '100%',
-              ...(item.type === 'text' && { 
-                color: item.color || '#ffffff',
-                fontFamily: item.font || 'Arial'
-              })
-            }}
-          >
-            {getItemContent()}
-            
-            {isSelected && !isPlaying && (
-              <div 
-                className="rotate-handle"
-                onMouseDown={handleRotateStart}
-                onMouseMove={handleRotateMove}
-              />
+          <ResizableBox
+            width={item.size.width}
+            height={item.size.height}
+            minConstraints={[50, 50]}
+            maxConstraints={[1000, 1000]}
+            resizeHandles={resizeHandles as ("s" | "se" | "sw" | "ne" | "nw" | "n" | "e" | "w")[]}
+            onResize={onResize}
+            onResizeStop={onResizeStop}
+            handle={(h, ref) => (
+              <div className={`custom-handle custom-handle-${h}`} ref={ref as React.Ref<HTMLDivElement>} />
             )}
-          </div>
-        </ResizableBox>
-      </motion.div>
-    );
-  };
-  
-  useEffect(() => {
-    const handleMouseUp = () => {
-      setRotating(false);
-      setActiveInteraction('none');
-    };
-    
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
-  
-  // Draw grid lines if snapToGrid is enabled
-  const renderGrid = () => {
-    if (!snapToGrid) return null;
-    
-    const gridLines = [];
-    const gridSize = 20;
-    const canvasWidth = canvasRef.current?.clientWidth || 1000;
-    const canvasHeight = canvasRef.current?.clientHeight || 800;
-    
-    // Vertical lines
-    for (let x = 0; x <= canvasWidth; x += gridSize) {
-      gridLines.push(
-        <line 
-          key={`v-${x}`} 
-          x1={x} 
-          y1={0} 
-          x2={x} 
-          y2={canvasHeight} 
-          stroke="rgba(0, 0, 0, 0.15)" 
-          strokeWidth="1" 
-        />
-      );
-    }
-    
-    // Horizontal lines
-    for (let y = 0; y <= canvasHeight; y += gridSize) {
-      gridLines.push(
-        <line 
-          key={`h-${y}`} 
-          x1={0} 
-          y1={y} 
-          x2={canvasWidth} 
-          y2={y} 
-          stroke="rgba(0, 0, 0, 0.15)" 
-          strokeWidth="1" 
-        />
-      );
-    }
-    
-    return (
-      <svg className="grid-overlay" width={canvasWidth} height={canvasHeight}>
-        {gridLines}
-      </svg>
+            className="resizable-box"
+          >
+            <div 
+              className={`media-item ${isSelected ? 'selected' : ''}`}
+              style={{
+                width: '100%',
+                height: '100%',
+                ...(item.type === 'text' && { 
+                  color: item.color || '#ffffff',
+                  fontFamily: item.font || 'Arial'
+                })
+              }}
+            >
+              {getItemContent()}
+              
+              {isSelected && !isPlaying && (
+                <div 
+                  className="rotate-handle"
+                  onMouseDown={handleRotateStart}
+                  onMouseMove={handleRotateMove}
+                />
+              )}
+            </div>
+          </ResizableBox>
+        </div>
+      </DraggableWrapper>
     );
   };
 
@@ -333,7 +273,11 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
         setActiveInteraction('none');
       }}
     >
-      {renderGrid()}
+      {/* Add a grid rendering function or remove this line if not needed */}
+      {/* Example: */}
+      <div className="grid-overlay">
+        {/* Render grid lines or any grid-related content here */}
+      </div>
       {mediaItems.map(renderMediaItem)}
       
       {isPlaying && (
