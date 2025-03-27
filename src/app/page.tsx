@@ -174,17 +174,6 @@ export default function Home() {
 
   return (
     <main className="app-container">
-      <MediaCanvas 
-        mediaItems={mediaItems}
-        onItemSelect={setSelectedItemId}
-        selectedItem={selectedItemId}
-        onItemMove={handleItemMove}
-        onItemResize={handleItemResize}
-        onItemRotate={handleItemRotate}
-        currentTime={currentTime}
-        isPlaying={isPlaying}
-        snapToGrid={snapToGrid}
-      />
       <MediaSidebar
         onAddImage={handleAddImage}
         onAddVideo={handleAddVideo}
@@ -196,6 +185,17 @@ export default function Home() {
         isPlaying={isPlaying}
         snapToGrid={snapToGrid}
         setSnapToGrid={setSnapToGrid}
+      />
+      <MediaCanvas 
+        mediaItems={mediaItems}
+        onItemSelect={setSelectedItemId}
+        selectedItem={selectedItemId}
+        onItemMove={handleItemMove}
+        onItemResize={handleItemResize}
+        onItemRotate={handleItemRotate}
+        currentTime={currentTime}
+        isPlaying={isPlaying}
+        snapToGrid={snapToGrid}
       />
     </main>
   );

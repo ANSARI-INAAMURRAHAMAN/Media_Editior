@@ -47,9 +47,8 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
   const [rotating, setRotating] = useState(false);
   const [initialRotation, setInitialRotation] = useState(0);
   const [initialAngle, setInitialAngle] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  
+  const [activeInteraction, setActiveInteraction] = useState<'none' | 'drag' | 'resize' | 'rotate'>('none');
+
   // Function to handle grid snapping
   const snapToGridValue = (value: number, gridSize: number = 20): number => {
     if (!snapToGrid) return value;
@@ -71,6 +70,7 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     const handleRotateStart = (e: React.MouseEvent) => {
       e.stopPropagation();
       setRotating(true);
+      setActiveInteraction('rotate');
       setInitialRotation(item.rotation || 0);
       
       // Calculate the center of the element
@@ -112,7 +112,7 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     // Handle resize from react-resizable
     const onResize = (e: React.SyntheticEvent, data: ResizeCallbackData) => {
       e.stopPropagation();
-      setIsResizing(true);
+      setActiveInteraction('resize');
       let { width, height } = data.size;
       
       // Apply grid snapping if enabled
@@ -125,7 +125,7 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     };
     
     const onResizeStop = () => {
-      setTimeout(() => setIsResizing(false), 100);
+      setTimeout(() => setActiveInteraction('none'), 100);
     };
     
     const resizeHandles = isSelected && !isPlaying ? ['se', 'sw', 'ne', 'nw', 'n', 's', 'e', 'w'] : [];
@@ -174,8 +174,8 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
       }
     };
     
-    // This will prevent dragging during resize operations
-    const shouldAllowDrag = !isPlaying && !rotating && !isResizing;
+    // Simplified drag conditions
+    const isDraggable = !isPlaying && activeInteraction === 'none';
     
     // Define motion props with proper typing
     const motionProps: HTMLMotionProps<"div"> = {
@@ -185,27 +185,29 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
         transformOrigin: 'center center',
         opacity: item.opacity ? item.opacity / 100 : 1,
         rotate: item.rotation || 0,
-        cursor: shouldAllowDrag ? 'move' : 'default',
+        cursor: isDraggable ? 'move' : 'default',
         zIndex: isSelected ? 10 : 2,
       },
       initial: { x: item.position.x, y: item.position.y },
       animate: { x: item.position.x, y: item.position.y },
-      drag: shouldAllowDrag,
+      drag: isDraggable,
       dragMomentum: false,
       dragElastic: 0,
-      onDragStart: () => setIsDragging(true),
+      onDragStart: (e, info) => {
+        setActiveInteraction('drag');
+      },
       onDrag: (e, info) => {
-        if (shouldAllowDrag) {
+        if (isDraggable) {
           const newX = snapToGridValue(item.position.x + info.delta.x);
           const newY = snapToGridValue(item.position.y + info.delta.y);
           onItemMove(item.id, { x: newX, y: newY });
         }
       },
       onDragEnd: () => {
-        setTimeout(() => setIsDragging(false), 100);
+        setActiveInteraction('none');
       },
       onClick: (e: React.MouseEvent) => {
-        if (!isPlaying && !isResizing && !isDragging) {
+        if (!isPlaying && activeInteraction === 'none') {
           e.stopPropagation();
           onItemSelect(item.id);
         }
@@ -261,11 +263,7 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
   useEffect(() => {
     const handleMouseUp = () => {
       setRotating(false);
-      // Small delay to ensure click events are processed correctly
-      setTimeout(() => {
-        setIsResizing(false);
-        setIsDragging(false);
-      }, 100);
+      setActiveInteraction('none');
     };
     
     document.addEventListener('mouseup', handleMouseUp);
@@ -326,12 +324,13 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
       ref={canvasRef}
       onClick={() => {
         // Deselect when clicking on the canvas (and not on an item)
-        if (!isResizing && !isDragging && !rotating) {
+        if (activeInteraction === 'none') {
           onItemSelect('');
         }
       }}
       onMouseUp={() => {
         setRotating(false);
+        setActiveInteraction('none');
       }}
     >
       {renderGrid()}
