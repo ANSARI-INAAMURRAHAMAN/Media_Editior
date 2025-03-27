@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import Draggable, { DraggableData, DraggableEvent } from 'react-draggable';
 import { ResizableBox, ResizeCallbackData } from 'react-resizable';
 import Image from 'next/image';
@@ -29,7 +29,6 @@ interface MediaCanvasProps {
   onItemRotate: (id: string, rotation: number) => void;
   currentTime: number;
   isPlaying: boolean;
-  snapToGrid: boolean;
 }
 
 const MediaCanvas: React.FC<MediaCanvasProps> = ({
@@ -41,7 +40,6 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
   onItemRotate,
   currentTime,
   isPlaying,
-  snapToGrid
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   // Create a Map to store refs for each media item
@@ -50,12 +48,73 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
   const [initialRotation, setInitialRotation] = useState(0);
   const [initialAngle, setInitialAngle] = useState(0);
   const [activeInteraction, setActiveInteraction] = useState<'none' | 'drag' | 'resize' | 'rotate'>('none');
-
-  const snapToGridValue = (value: number, gridSize: number = 20): number => {
-    if (!snapToGrid) return value;
-    return Math.round(value / gridSize) * gridSize;
-  };
+  const [rotatingItemId, setRotatingItemId] = useState<string | null>(null);
   
+  // Update the useEffect to use more direct event handling
+  useEffect(() => {
+    if (!rotating || !rotatingItemId) return;
+    
+    console.log("Rotation active for item:", rotatingItemId);
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      e.preventDefault();
+      
+      const selectedItem = mediaItems.find(item => item.id === rotatingItemId);
+      if (!selectedItem) return;
+      
+      // Get the element directly using querySelectorAll and data attribute
+      const elements = document.querySelectorAll(`[data-id="${rotatingItemId}"]`);
+      if (!elements.length) {
+        console.log("Could not find element with id:", rotatingItemId);
+        return;
+      }
+      
+      // Cast the element to HTMLElement to access style property
+      const element = elements[0] as HTMLElement;
+      const rect = element.getBoundingClientRect();
+      
+      // Calculate center of the element
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      // Calculate the angle between the center and cursor
+      const currentAngleRad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+      const currentAngle = currentAngleRad * (180 / Math.PI);
+      
+      // Calculate the rotation
+      let newRotation = initialRotation + (currentAngle - initialAngle);
+      
+      // Normalize rotation to 0-360 degrees
+      newRotation = newRotation % 360;
+      if (newRotation < 0) newRotation += 360;
+      
+      console.log("Rotating to:", newRotation, "degrees");
+      
+      // Apply rotation to the element immediately for visual feedback
+      element.style.transform = `rotate(${newRotation}deg)`;
+      
+      // Update the state
+      onItemRotate(rotatingItemId, newRotation);
+    };
+    
+    const handleMouseUp = () => {
+      console.log("Rotation ended");
+      setRotating(false);
+      setRotatingItemId(null);
+      setActiveInteraction('none');
+    };
+    
+    // Add event listeners
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    // Return cleanup function
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [rotating, rotatingItemId, initialRotation, initialAngle, mediaItems, onItemRotate]);
+
   const renderMediaItem = (item: MediaItem) => {
     // Get or create ref for this item
     if (!draggableRefs.has(item.id)) {
@@ -71,37 +130,37 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
     
     const handleRotateStart = (e: React.MouseEvent) => {
       e.stopPropagation();
+      e.preventDefault();
+      
+      console.log("Starting rotation for item:", item.id);
+      
       setRotating(true);
+      setRotatingItemId(item.id);
       setActiveInteraction('rotate');
       setInitialRotation(item.rotation || 0);
-      const rect = (e.currentTarget.parentNode as HTMLElement).getBoundingClientRect();
+      
+      // Get the parent element's position
+      const parentElement = e.currentTarget.closest('.media-item-container') as HTMLElement;
+      if (!parentElement) {
+        console.log("Could not find parent element");
+        return;
+      }
+      
+      const rect = parentElement.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
+      
+      // Calculate initial angle
       const initialAngleRad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-      setInitialAngle(initialAngleRad * (180 / Math.PI));
-    };
-    
-    const handleRotateMove = (e: React.MouseEvent) => {
-      if (!rotating) return;
-      e.stopPropagation();
-      e.preventDefault();
-      const rect = (e.currentTarget.parentNode as HTMLElement).getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const angleRad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-      const angle = angleRad * (180 / Math.PI);
-      let newRotation = initialRotation + (angle - initialAngle);
-      if (snapToGrid) newRotation = Math.round(newRotation / 15) * 15;
-      onItemRotate(item.id, newRotation);
+      const angle = initialAngleRad * (180 / Math.PI);
+      
+      console.log("Initial angle:", angle, "degrees");
+      setInitialAngle(angle);
     };
 
     const onResize = (_e: React.SyntheticEvent, data: ResizeCallbackData) => {
       setActiveInteraction('resize');
-      let { width, height } = data.size;
-      if (snapToGrid) {
-        width = snapToGridValue(width, 10);
-        height = snapToGridValue(height, 10);
-      }
+      const { width, height } = data.size;
       onItemResize(item.id, { width, height });
     };
     
@@ -123,9 +182,7 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
         e.preventDefault();
         return false;
       }
-      const newX = snapToGridValue(data.x);
-      const newY = snapToGridValue(data.y);
-      onItemMove(item.id, { x: newX, y: newY });
+      onItemMove(item.id, { x: data.x, y: data.y });
     };
     
     const handleDragStop = () => {
@@ -188,20 +245,26 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
         positionOffset={{ x: 0, y: 0 }}
         allowAnyClick={true}
         enableUserSelectHack={true}
-        grid={[1, 1]}
+        grid={undefined}
         scale={1}
       >
         <div
           ref={draggableRef}
+          data-id={item.id}
           className={`media-item-container ${isSelected ? 'selected-container' : ''}`}
           style={{
             position: 'absolute',
             transformOrigin: 'center center',
             opacity: item.opacity ? item.opacity / 100 : 1,
             transform: `rotate(${item.rotation || 0}deg)`,
+            width: `${item.size.width}px`, // Ensure width is explicitly set
+            height: `${item.size.height}px`, // Ensure height is explicitly set
             cursor: isDraggable && activeInteraction === 'none' ? 'move' : 'default',
             zIndex: isSelected ? 10 : 2,
-            transition: 'transform 0.2s ease, opacity 0.2s ease, border 0.2s ease',
+            // Remove transition during rotation to avoid lag
+            transition: rotating && item.id === rotatingItemId 
+              ? 'none'  // No transition during rotation for immediate feedback
+              : 'transform 0.1s ease, opacity 0.2s ease, border 0.2s ease',
             border: isSelected ? '2px solid blue' : '2px solid transparent',
             borderRadius: '4px'
           }}
@@ -242,17 +305,18 @@ const MediaCanvas: React.FC<MediaCanvasProps> = ({
                 <div 
                   className="rotate-handle"
                   onMouseDown={handleRotateStart}
-                  onMouseMove={handleRotateMove}
                   style={{
                     position: 'absolute',
-                    bottom: -25,
+                    bottom: -30, // Move farther from the box
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    width: 20,
-                    height: 20,
+                    width: 24, // Make handle larger
+                    height: 24, // Make handle larger
                     borderRadius: '50%',
                     background: 'blue',
-                    cursor: 'grab'
+                    cursor: 'grab',
+                    zIndex: 1000,
+                    border: '2px solid white' // Add border for visibility
                   }}
                 />
               )}

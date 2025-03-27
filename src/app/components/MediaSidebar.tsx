@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Dropzone } from '@mantine/dropzone';
-import { Button, TextInput, Slider, ColorInput, Tabs, Select, NumberInput, Group, Switch } from '@mantine/core';
+import { Button, TextInput, Slider, ColorInput, Tabs, Select, NumberInput, Group } from '@mantine/core';
 import { IconUpload, IconPhoto, IconTypography, IconTrash, IconPlayerPlay} from '@tabler/icons-react';
 
 interface MediaItem {
@@ -28,8 +28,6 @@ interface MediaSidebarProps {
   onUpdateItem: (changes: Partial<MediaItem>) => void;
   onPlayTimeline: () => void;
   isPlaying: boolean;
-  snapToGrid: boolean;
-  setSnapToGrid: (value: boolean) => void;
 }
 
 const MediaSidebar: React.FC<MediaSidebarProps> = ({
@@ -40,9 +38,7 @@ const MediaSidebar: React.FC<MediaSidebarProps> = ({
   selectedItem,
   onUpdateItem,
   onPlayTimeline,
-  isPlaying,
-  snapToGrid,
-  setSnapToGrid
+  isPlaying
 }) => {
   const [textContent, setTextContent] = useState('');
 
@@ -110,16 +106,6 @@ const MediaSidebar: React.FC<MediaSidebarProps> = ({
               {isPlaying ? "Stop" : "Play Timeline"}
             </Button>
           </div>
-          
-          <div className="control-panel">
-            <Group>
-              <Switch 
-                label="Snap to Grid" 
-                checked={snapToGrid}
-                onChange={(event) => setSnapToGrid(event.currentTarget.checked)}
-              />
-            </Group>
-          </div>
         </Tabs.Panel>
 
         <Tabs.Panel value="edit" className="tab-panel">
@@ -176,7 +162,7 @@ const MediaSidebar: React.FC<MediaSidebarProps> = ({
                     onChange={(value) => onUpdateItem({ rotation: value })}
                     min={0}
                     max={360}
-                    step={snapToGrid ? 15 : 1}
+                    step={1}
                     label={(value) => `${value}°`}
                     style={{ marginTop: '0.5rem' }}
                   />

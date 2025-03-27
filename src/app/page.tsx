@@ -24,7 +24,6 @@ export default function Home() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [snapToGrid, setSnapToGrid] = useState(false); // Added grid snapping state
   
   const timerRef = useRef<number | null>(null);
   const lastUpdateTimeRef = useRef<number | null>(null);
@@ -183,8 +182,6 @@ export default function Home() {
         onUpdateItem={handleUpdateItem}
         onPlayTimeline={handlePlayTimeline}
         isPlaying={isPlaying}
-        snapToGrid={snapToGrid}
-        setSnapToGrid={setSnapToGrid}
       />
       <MediaCanvas 
         mediaItems={mediaItems}
@@ -195,7 +192,6 @@ export default function Home() {
         onItemRotate={handleItemRotate}
         currentTime={currentTime}
         isPlaying={isPlaying}
-        snapToGrid={snapToGrid}
       />
     </main>
   );
